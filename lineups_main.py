@@ -1,6 +1,9 @@
-from flask import Flask, render_template, redirect, request, url_for
+from flask import Flask, render_template, redirect, request, url_for, jsonify, g
 from flask_login import login_user, LoginManager, UserMixin, login_required, logout_user, current_user
 from werkzeug.security import check_password_hash
+
+from flask_httpauth import HTTPBasicAuth
+from passlib.apps import custom_app_context as pwd_context
 
 from flask_sqlalchemy import SQLAlchemy
 #from flask_migrate import Migrate
@@ -28,10 +31,13 @@ db = SQLAlchemy(app)
 #do I really need this if I am building from scratch ?? prolly not
 #migrate = Migrate(app, db)
 
-#set secret key and manage login
+#set secret key and manage login for in-site navigation
 app.secret_key = "ldghlkdsfsfdlh"
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+#API request authentication
+auth = HTTPBasicAuth()
 
 ##########class definitions#########
 class User(UserMixin, db.Model):
@@ -49,6 +55,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(132))
 
     def check_password(self, password):
+        """This is for users navigating the site through a browser"""
         return check_password_hash(self.password_hash, password)
 
     def get_id(self):
@@ -143,6 +150,50 @@ def login():
 def logout():
     logout_user()
     return render_template("logout_msg.html")
+
+game_ids = {123:'a', 345:'b', 567: 'c'}
+@app.route("/game/<game_id>", methods = ['GET','POST'])
+def request_game(game_id=None):
+    if game_id == None:
+        return "no game requested"
+
+    try:
+        game_id = int(game_id)
+    except:
+        return 'requested game_id should be integer'
+
+    if request.method == 'GET':
+        return "requested game " + str(game_id)+ " but no authentication attempted"
+
+    try:
+        username = request.json.get('username')
+        password = request.json.get('password')
+        if username is None or password is None:
+            return 'missing credentials'
+    except:
+        return 'problem in acquiring user credentials'
+
+    user = User.query.filter_by(username = username).first()
+    if user is None:
+        return 'incorrect username or password (u)'
+
+    if not verify_password(user, password):
+        return 'incorrect username or password (p)'
+
+    if game_id not in game_ids:
+        return 'requested game_id missing'
+
+    try:
+        return jsonify({ 'game_id': game_id, 'data': game_ids[game_id] })
+    except:
+        return game_ids[game_id]
+
+@auth.verify_password
+def verify_password(user, password):
+    if not user.check_password(password):
+        return False
+    g.user = user
+    return True
 
 #launch
 if __name__ == '__main__':
