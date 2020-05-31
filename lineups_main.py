@@ -3,12 +3,13 @@ from flask_login import login_user, LoginManager, UserMixin, login_required, log
 from werkzeug.security import check_password_hash
 
 from flask_httpauth import HTTPBasicAuth
-from passlib.apps import custom_app_context as pwd_context
 
 from flask_sqlalchemy import SQLAlchemy
 #from flask_migrate import Migrate
 
 from datetime import datetime
+
+__version__ = 0.3
 
 #create app object from Flask class
 app = Flask(__name__)
@@ -154,6 +155,18 @@ def logout():
 game_ids = {123:'a', 345:'b', 567: 'c'}
 @app.route("/game/<game_id>", methods = ['GET','POST'])
 def request_game(game_id=None):
+    returned = request_handler(request, game_id)
+
+#    #create the Python object that represents the comment
+#    #send comment to DB for storage (keeping transaction open)
+#    #commit DB query(/ies) - for future implementation -currently not working
+#    user_request = RequestInfo(game_id=returned, requester=2)
+#    db.session.add(user_request)
+#    db.session.commit()
+
+    return returned
+
+def request_handler(request, game_id):
     if game_id == None:
         return "no game requested"
 
